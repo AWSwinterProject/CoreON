@@ -13,7 +13,7 @@
             keyProperty="attachmentId"
             keyColumn="attachment_id">
         INSERT INTO notice_attachment
-            (notice_id, file_name, file_url, content_type, file_size)
+            (notice_id, originalname, storedurl, content_type, sizebytes)
         VALUES
             (#{noticeId}, #{originalName}, #{storedUrl}, #{contentType}, #{sizeBytes})
     </insert>
@@ -28,10 +28,10 @@
             resultType="com.coreon.notice.dto.AttachResponseDTO">
         SELECT
             attachment_id AS attachmentId,
-            file_name      AS originalName,
-            file_url       AS storedUrl,
+            originalname      AS originalName,
+            storedurl     AS storedUrl,
             content_type   AS contentType,
-            file_size      AS sizeBytes,
+            sizebytes      AS sizeBytes,
             created_at     AS createdAt
         FROM notice_attachment
         WHERE notice_id = #{noticeId}
@@ -50,10 +50,10 @@
         SELECT
             attachment_id AS attachmentId,
             notice_id     AS noticeId,
-            file_name     AS originalName,
-            file_url      AS storedUrl,
+            originalname     AS originalName,
+            storedurl      AS storedUrl,
             content_type  AS contentType,
-            file_size     AS sizeBytes,
+            sizebytes     AS sizeBytes,
             created_at    AS createdAt
         FROM notice_attachment
         WHERE attachment_id = #{attachmentId}
@@ -68,5 +68,8 @@
         DELETE FROM notice_attachment
         WHERE attachment_id = #{attachmentId}
     </delete>
+    
+
+    
 
 </mapper>

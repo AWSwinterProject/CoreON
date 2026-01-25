@@ -48,10 +48,12 @@ cloud:
     stack:
       auto: false
     s3:
-      bucket: cloudnative1004
+      bucket: coreon
 
 # ===========================
 # 🔥 프론트엔드 CORS Origin
 # ===========================
 custom:
   frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5500}
+  s3:
+    prefix: notice/

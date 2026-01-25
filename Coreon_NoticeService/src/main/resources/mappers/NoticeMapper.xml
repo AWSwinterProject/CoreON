@@ -67,5 +67,11 @@
         DELETE FROM notice
         WHERE notice_id = #{noticeId}
     </delete>
+    
+     <select id="existsNotice" parameterType="long" resultType="int">
+    SELECT EXISTS(
+      SELECT 1 FROM notice WHERE notice_id = #{noticeId}
+    )
+  </select>
 
 </mapper>
