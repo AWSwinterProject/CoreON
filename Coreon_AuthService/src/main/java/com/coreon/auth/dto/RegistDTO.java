@@ -9,6 +9,7 @@ public class RegistDTO {
     private String mobile;
     private String dept;     
     private String position;
+    private String role;
    
     
    
@@ -93,6 +94,24 @@ public class RegistDTO {
 		this.position = position;
 	}
 
+
+
+
+
+	public String getRole() {
+		return role;
+	}
+
+
+
+
+
+	public void setRole(String role) {
+		this.role = role;
+	}
+
+	
+	
 
 	
 }

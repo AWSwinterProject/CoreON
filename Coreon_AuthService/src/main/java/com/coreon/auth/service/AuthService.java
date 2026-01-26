@@ -71,6 +71,10 @@ public class AuthService {
             session.setAttribute("id", check.getId());
             session.setAttribute("username", check.getUsername());
             session.setAttribute("position", check.getPosition());
+            session.setAttribute("role", check.getRole());
+            session.setAttribute("dept", check.getDept());
+
+
 
             return "로그인 성공";
         }
