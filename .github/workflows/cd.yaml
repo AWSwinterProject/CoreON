@@ -1,0 +1,137 @@
+name: CD - Deploy ECS (taskdef image -> github.sha)
+
+on:
+  workflow_run:
+    workflows: ["CI - Build & Push to ECR"]
+    types: [completed]
+
+permissions:
+  contents: read
+  # Access Key 방식이면 id-token 필요 없음(있어도 문제는 없음)
+  # id-token: write
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECS_CLUSTER: coreon-intranet-cluster
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
+
+jobs:
+  deploy:
+    name: Deploy ECS services (by matrix)
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - app: nginx
+          - app: redis
+          - app: front
+          - app: auth
+          - app: member
+          - app: faq
+          - app: board
+          - app: notice
+
+    steps:
+      # (선택) 작업 로그에 sha 확인용
+      - name: Print CI SHA
+        run: |
+          echo "Triggered by CI workflow_run"
+          echo "head_sha = ${{ github.event.workflow_run.head_sha }}"
+
+      - name: Configure AWS credentials (Access Key)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # (선택) AWS 인증이 제대로 되었는지 1초 검증
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Deploy ${{ matrix.app }} (replace taskdef image to SHA)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP="${{ matrix.app }}"
+          SERVICE_NAME="${APP}-service"
+          CONTAINER_NAME="${APP}"
+
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          IMAGE_URI="${ECR_REGISTRY}/coreon-${APP}:${SHA}"
+
+          echo "==> Deploying APP=${APP}"
+          echo "    Cluster : ${ECS_CLUSTER}"
+          echo "    Service : ${SERVICE_NAME}"
+          echo "    Container: ${CONTAINER_NAME}"
+          echo "    Image   : ${IMAGE_URI}"
+
+          # 1) 현재 서비스의 task definition ARN 조회
+          TD_ARN=$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${SERVICE_NAME}" \
+            --query "services[0].taskDefinition" \
+            --output text)
+
+          if [[ -z "${TD_ARN}" || "${TD_ARN}" == "None" ]]; then
+            echo "ERROR: Could not resolve taskDefinition for service ${SERVICE_NAME}"
+            exit 1
+          fi
+
+          echo "    Current TD: ${TD_ARN}"
+
+          # 2) task definition JSON 가져오기
+          aws ecs describe-task-definition \
+            --task-definition "${TD_ARN}" \
+            --query "taskDefinition" \
+            --output json > td.json
+
+          # 3) 불필요한 필드 제거 + 해당 컨테이너의 image만 교체
+          jq --arg IMAGE "$IMAGE_URI" --arg CNAME "$CONTAINER_NAME" '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions = (
+                .containerDefinitions
+                | map(if .name == $CNAME then .image = $IMAGE else . end)
+              )
+          ' td.json > td-new.json
+
+          # sanity check: 컨테이너명이 일치하지 않으면 이미지가 안 바뀜 → 방지
+          if ! jq -e --arg CNAME "$CONTAINER_NAME" --arg IMAGE "$IMAGE_URI" \
+            '.containerDefinitions[] | select(.name==$CNAME) | .image==$IMAGE' td-new.json >/dev/null; then
+            echo "ERROR: container name mismatch or image not updated."
+            echo "       Expected container name: ${CONTAINER_NAME}"
+            echo "       Check Terraform container name and matrix.app value."
+            echo "       Dump container names:"
+            jq -r '.containerDefinitions[].name' td-new.json
+            exit 1
+          fi
+
+          # 4) 새 task definition revision 등록
+          NEW_TD_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://td-new.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "    New TD: ${NEW_TD_ARN}"
+
+          # 5) 서비스 업데이트 (롤링 배포)
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${SERVICE_NAME}" \
+            --task-definition "${NEW_TD_ARN}" \
+            --force-new-deployment >/dev/null
+
+          echo "Update triggered for ${SERVICE_NAME}"
