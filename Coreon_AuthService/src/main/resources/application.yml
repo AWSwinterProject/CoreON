@@ -53,4 +53,4 @@ cloud:
 # 🔥 프론트엔드 CORS Origin
 # ===========================
 custom:
-  frontend-origin: ${FRONTEND_ORIGIN:http://10.0.12.84:5500}
+  frontend-origin: ${FRONTEND_ORIGIN:http://10.0.11.129:5500}
