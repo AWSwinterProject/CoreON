@@ -19,7 +19,6 @@ public class AuthController {
 
     @Autowired private AuthService service;
     @Autowired private HttpSession session;   // 세션은 Redis로 공유 (과제 요건)
-    @Autowired private S3service s3service;
 
     // =====================================================================
     // 1. (변경) 아이디 중복 체크
@@ -42,19 +41,7 @@ public class AuthController {
     // 2. (변경) 프로필 이미지 업로드 전용 REST API
 
     // =====================================================================
-    @PostMapping("/profile/image")
-    public ResponseEntity<?> uploadProfileImage(@RequestPart("imageFile") MultipartFile file) {
-        try {
-            String imageUrl = s3service.uploadFile(file);  // S3 업로드는 기존 로직 재사용
 
-        
-            return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "이미지 업로드 실패: " + e.getMessage()));
-        }
-    }
 
     // =====================================================================
     // 3. (핵심 변경) 회원가입 최종 처리
