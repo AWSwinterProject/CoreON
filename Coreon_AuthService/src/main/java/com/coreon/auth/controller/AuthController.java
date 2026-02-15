@@ -9,7 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.coreon.auth.dto.RegistDTO;
 import com.coreon.auth.service.AuthService;
-import com.coreon.auth.service.S3service;
+
 
 import java.util.Map;
 
